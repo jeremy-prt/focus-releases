@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Focus — Minuteur Pomodoro pour macOS</title>
+<meta name="description" content="Un minuteur Pomodoro natif pour macOS. Le compte à rebours vit dans l'encoche, le cycle s'enchaîne tout seul. Gratuit, macOS 14+.">
+<link rel="icon" type="image/png" href="icon.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Focus — Minuteur Pomodoro pour macOS">
+<meta property="og:description" content="Le compte à rebours vit dans l'encoche, le cycle s'enchaîne tout seul. Gratuit, macOS 14+.">
+<meta property="og:image" content="screenshot.png">
+<meta property="og:url" content="https://jeremy-prt.github.io/focus-releases/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700;900&display=swap" rel="stylesheet">
+<style>
+  /* Jeton de couleurs et d'échelle repris tels quels du fichier Figma de Klack
+     (SF Pro, #292524 sur #fff7ed, surlignage #f4a8ff, boutons r=16). */
+  :root {
+    --cream: #fff7ed;
+    --ink: #292524;
+    --mark: #f4a8ff;
+    --soft: rgba(41, 37, 36, 0.05);
+    --muted-s: rgba(166, 160, 155, 0.9);
+    --muted-l: rgba(121, 113, 107, 0.9);
+    --shell: 1024px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--cream);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+                 "Inter Tight", system-ui, sans-serif;
+    font-weight: 700;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  img { max-width: 100%; display: block; }
+
+  a { color: inherit; text-decoration: none; }
+
+  .shell { width: 100%; max-width: var(--shell); margin: 0 auto; padding: 0 24px; }
+
+  /* ---------- en-tête ---------- */
+
+  .site-header {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(255, 247, 237, 0.95);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(231, 229, 228, 0.05);
+    box-shadow: 0 25px 50px -12px rgba(87, 83, 77, 0.1);
+  }
+  .site-header > div {
+    max-width: 1728px; margin: 0 auto;
+    padding: 18px 32px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; font-size: 24px; letter-spacing: 0.072px; }
+  .brand img { width: 40px; height: 40px; border-radius: 12px; }
+  .header-actions { display: flex; align-items: center; gap: 4px; }
+
+  /* ---------- boutons ---------- */
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 16px 20px; border-radius: 16px;
+    font-size: 18px; font-weight: 700; letter-spacing: -0.45px; line-height: 28px;
+    font-family: inherit; border: 0; cursor: pointer;
+    transition: transform .16s ease, background-color .16s ease;
+  }
+  .btn svg { width: 26px; height: 26px; flex: none; }
+  .btn-primary {
+    background: var(--ink); color: var(--cream);
+    box-shadow: 0 20px 25px -5px rgba(41, 37, 36, 0.25), 0 8px 10px -6px rgba(41, 37, 36, 0.25);
+  }
+  .btn-ghost { background: var(--soft); color: var(--ink); }
+  .btn:hover { transform: translateY(-1px); }
+  .btn-ghost:hover { background: rgba(41, 37, 36, 0.09); }
+  .btn-quiet { background: none; }
+  .btn-quiet:hover { background: var(--soft); transform: none; }
+  .btn-quiet svg { width: 22px; height: 22px; }
+  .tag {
+    background: var(--ink); color: var(--cream);
+    font-size: 14px; line-height: 20px; letter-spacing: 0.35px;
+    padding: 4px 8px; border-radius: 8px;
+  }
+
+  /* ---------- accroche ---------- */
+
+  .hero { padding-top: clamp(56px, 11vw, 192px); padding-bottom: 80px; }
+  h1 {
+    font-size: clamp(42px, 8.1vw, 96px);
+    line-height: 1; letter-spacing: -0.025em; font-weight: 700;
+    text-wrap: balance;
+  }
+  .mark { position: relative; font-weight: 900; white-space: nowrap; }
+  .mark::before {
+    content: ""; position: absolute; z-index: -1;
+    /* le bas de la barre tombe sur la ligne de base, pas sous les jambages */
+    left: -0.02em; right: -0.02em; bottom: 0.1em; height: 0.45em;
+    background: var(--mark);
+  }
+  .hero-actions {
+    margin-top: 48px;
+    display: flex; align-items: center; flex-wrap: wrap; gap: 28px;
+  }
+  .facts { display: flex; gap: 28px; }
+  .fact { line-height: 1.15; }
+  .fact span { display: block; font-size: 14px; letter-spacing: -0.154px; color: var(--muted-s); }
+  .fact strong { display: block; font-size: 18px; letter-spacing: -0.45px; color: var(--muted-l); }
+
+  /* ---------- la scène macOS ---------- */
+
+  /* .stage ne rogne rien : le menu de la barre des menus déborde de l'écran */
+  .stage { position: relative; container-type: inline-size; }
+
+  .scene {
+    position: relative; width: 100%; aspect-ratio: 2 / 1;
+    container-type: size;
+    border-radius: 28px; overflow: hidden;
+    /* fond d'écran volontairement froid : la fenêtre de l'app est chaude,
+       sur un dégradé chaud elle se noierait dedans */
+    background:
+      radial-gradient(60cqw 70cqh at 12% 8%, #3d6ee8 0%, transparent 58%),
+      radial-gradient(55cqw 65cqh at 88% 18%, #7b3fd4 0%, transparent 55%),
+      radial-gradient(70cqw 60cqh at 70% 100%, #1c8fa8 0%, transparent 62%),
+      linear-gradient(155deg, #101a3a 0%, #1d1846 45%, #14243f 100%);
+    box-shadow: 0 40px 80px -24px rgba(41, 37, 36, 0.4);
+  }
+
+  /* la pastille d'encoche : dessinée, pas capturée — nette à toutes les tailles */
+  .notch {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    height: 3.6cqw; min-width: 14cqw;
+    padding: 0 2.2cqw;
+    display: flex; align-items: center; justify-content: center;
+    background: #000; border-radius: 0 0 1.4cqw 1.4cqw;
+    color: #fff; font-size: 1.7cqw; letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+  }
+  .notch::before, .notch::after {
+    content: ""; position: absolute; top: 0; width: 1.2cqw; height: 1.2cqw;
+  }
+  .notch::before {
+    left: -1.2cqw;
+    background: radial-gradient(circle 1.2cqw at 0 100%, transparent 99%, #000 100%);
+  }
+  .notch::after {
+    right: -1.2cqw;
+    background: radial-gradient(circle 1.2cqw at 100% 100%, transparent 99%, #000 100%);
+  }
+
+  .apple-btn {
+    position: absolute; top: 3.1cqw; left: 3.1cqw;
+    width: 4.7cqw; height: 4.7cqw; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255, 247, 237, 0.15);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  }
+  .apple-btn svg { width: 2.3cqw; height: 2.3cqw; fill: #fff7ed; }
+
+  .menubar {
+    position: absolute; top: 3.1cqw; right: 3.1cqw; height: 4.7cqw;
+    display: flex; align-items: center; gap: 1.9cqw; padding: 0 1.6cqw;
+    border-radius: 2.4cqw;
+    background: rgba(255, 247, 237, 0.15);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    color: #fff7ed; font-size: 1.6cqw; letter-spacing: -0.01em;
+  }
+  .menubar svg { width: 2cqw; height: 2cqw; display: block; }
+
+  .window {
+    position: absolute; left: 3.1cqw; top: 7cqh;
+    height: 86cqh; width: auto;
+    border-radius: 1.8cqw;
+    box-shadow: 0 3cqh 6cqh -1cqh rgba(0, 0, 0, 0.55);
+  }
+
+  /* le menu de la barre des menus, refait en HTML pour rester net.
+     Enfant de .stage et non de .scene : il déborde de l'écran au lieu d'être rogné. */
+  .panel {
+    position: absolute; right: -2.4cqw; top: 11cqw; width: 28cqw;
+    border-radius: 1.4cqw; padding: 1.2cqw 0;
+    background: rgba(250, 247, 243, 0.94);
+    backdrop-filter: blur(24px) saturate(140%); -webkit-backdrop-filter: blur(24px) saturate(140%);
+    border-top: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 2.4cqw 4.8cqw -1.2cqw rgba(41, 37, 36, 0.35);
+    color: var(--ink); font-size: 1.5cqw; line-height: 2.4cqw;
+  }
+  .panel .row {
+    display: flex; align-items: center; justify-content: space-between; gap: 1cqw;
+    padding: 0.35cqw 1.2cqw;
+  }
+  .panel .row.dim { color: rgba(41, 37, 36, 0.45); font-size: 1.35cqw; }
+  .panel hr { border: 0; border-top: 1px solid rgba(41, 37, 36, 0.12); margin: 0.6cqw 1.2cqw; }
+  .panel .switch {
+    width: 3.4cqw; height: 1.9cqw; border-radius: 1cqw; background: #34c759;
+    position: relative; flex: none;
+  }
+  .panel .switch::after {
+    content: ""; position: absolute; top: 0.2cqw; right: 0.2cqw;
+    width: 1.5cqw; height: 1.5cqw; border-radius: 50%; background: #fff;
+    box-shadow: 0 0.1cqw 0.3cqw rgba(0, 0, 0, 0.25);
+  }
+
+  /* ---------- le Dock ---------- */
+
+  .dock {
+    position: absolute; left: 50%; bottom: 5.5cqh; transform: translateX(-50%);
+    display: flex; align-items: flex-end; gap: 1.17cqw; padding: 1.17cqw;
+    border-radius: 2.34cqw;
+    background: rgba(255, 247, 237, 0.15);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(255, 247, 237, 0.15);
+  }
+  .dock-app {
+    position: relative; display: block; width: 6.25cqw; height: 6.25cqw;
+    transform-origin: bottom center;
+    transition: transform .18s cubic-bezier(.2, .8, .3, 1);
+  }
+  /* juste l'icône survolée, sans entraîner ses voisines */
+  .dock-app:hover, .dock-app:focus-visible { transform: translateY(-0.3cqw) scale(1.1); }
+  .dock-app img {
+    width: 100%; height: 100%; border-radius: 22.5%;
+    filter: drop-shadow(0 0.1cqw 0.11cqw rgba(12, 10, 9, 0.3));
+  }
+  .dock-app:focus-visible { outline: 2px solid #fff7ed; outline-offset: 3px; border-radius: 22.5%; }
+  .dock-app .tip {
+    position: absolute; bottom: calc(100% + 1.6cqw); left: 50%;
+    transform: translate(-50%, 0.4cqw); opacity: 0; pointer-events: none;
+    padding: 0.5cqw 1.1cqw; border-radius: 1cqw; white-space: nowrap;
+    background: rgba(28, 25, 23, 0.72);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    color: #fff7ed; font-size: 1.5cqw; line-height: 1.5;
+    transition: opacity .16s ease, transform .16s ease;
+  }
+  .dock-app:hover .tip, .dock-app:focus-visible .tip { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---------- ce que fait l'app ---------- */
+
+  .features {
+    padding: 96px 0 0;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+  }
+  .feature { text-align: center; padding: 0 8px; }
+  .feature svg { width: 72px; height: 72px; margin: 0 auto 20px; stroke: var(--ink); }
+  .feature h2 { font-size: 28px; line-height: 36px; letter-spacing: -0.5px; font-weight: 700; }
+
+  .closing { padding: 96px 0; text-align: center; }
+
+  /* ---------- questions ---------- */
+
+  .faq { padding-bottom: 96px; max-width: 720px; margin: 0 auto; }
+  .faq h2 { font-size: 36px; letter-spacing: -1px; margin-bottom: 24px; text-align: center; }
+  details {
+    background: var(--soft); border-radius: 16px; padding: 18px 20px; margin-bottom: 10px;
+  }
+  summary {
+    font-size: 18px; letter-spacing: -0.45px; cursor: pointer; list-style: none;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::after {
+    content: "+"; font-size: 24px; line-height: 1; color: var(--muted-l); flex: none;
+  }
+  details[open] summary::after { content: "–"; }
+  details p {
+    font-size: 17px; line-height: 26px; font-weight: 600; color: var(--muted-l);
+    margin-top: 12px;
+  }
+  details p + p { margin-top: 8px; }
+
+  /* ---------- pied de page ---------- */
+
+  footer { padding-top: 40px; overflow: hidden; }
+  .footer-links {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-size: 16px; color: var(--muted-l);
+  }
+  .footer-links a {
+    padding: 8px 12px; border-radius: 10px;
+    transition: color .16s ease, background-color .16s ease;
+  }
+  .footer-links a:hover { color: var(--ink); background: var(--soft); }
+  /* le mot géant du pied de page : rempli d'un dégradé qui se dissout vers le bas */
+  .wordmark {
+    margin-top: 8px; text-align: center; line-height: 0.78;
+    font-size: clamp(96px, 28vw, 352px); font-weight: 900; letter-spacing: -0.045em;
+    user-select: none;
+    background: linear-gradient(180deg,
+      rgba(41, 37, 36, 0.22) 0%,
+      rgba(41, 37, 36, 0.1) 48%,
+      rgba(41, 37, 36, 0) 88%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+  }
+
+  /* ---------- adaptatif ---------- */
+
+  @media (max-width: 900px) {
+    .features { grid-template-columns: repeat(2, 1fr); row-gap: 56px; }
+    .feature h2 { font-size: 24px; line-height: 32px; }
+  }
+
+  @media (max-width: 720px) {
+    .site-header > div { padding: 14px 20px; }
+    .header-actions .btn span { display: none; }
+    .header-actions .btn-primary { padding: 12px 16px; }
+    .btn-quiet { display: none; }
+    .hero-actions { gap: 20px; }
+    .facts { gap: 20px; }
+    /* la scène passe en 4:3 : sinon la fenêtre de l'app devient illisible */
+    .scene { aspect-ratio: 4 / 3; border-radius: 20px; }
+    .notch { height: 5cqw; min-width: 20cqw; font-size: 2.4cqw; padding: 0 3cqw; }
+    .notch::before, .notch::after { width: 1.8cqw; height: 1.8cqw; }
+    .notch::before { left: -1.8cqw; background: radial-gradient(circle 1.8cqw at 0 100%, transparent 99%, #000 100%); }
+    .notch::after { right: -1.8cqw; background: radial-gradient(circle 1.8cqw at 100% 100%, transparent 99%, #000 100%); }
+    .apple-btn, .menubar { height: 6.4cqw; }
+    .apple-btn { width: 6.4cqw; }
+    .menubar { font-size: 2.2cqw; gap: 2.4cqw; }
+    .menubar svg { width: 2.8cqw; height: 2.8cqw; }
+    .panel { display: none; }
+    .window { left: 50%; transform: translateX(-50%); top: 12cqh; height: 66cqh; }
+    .dock { gap: 1.6cqw; padding: 1.6cqw; border-radius: 3.2cqw; }
+    .dock-app { width: 8.6cqw; height: 8.6cqw; }
+    .dock-app .tip { font-size: 2.2cqw; padding: 0.7cqw 1.5cqw; border-radius: 1.4cqw; }
+    .features { padding-top: 72px; }
+    .closing, .faq { padding-bottom: 72px; }
+    .closing { padding-top: 72px; }
+  }
+
+  @media (max-width: 420px) {
+    .facts { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div>
+    <a class="brand" href="#top"><img src="icon.png" alt="" width="40" height="40">Focus</a>
+    <nav class="header-actions">
+      <a class="btn btn-quiet" href="#faq">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        FAQ
+      </a>
+      <a class="btn btn-primary" href="https://github.com/jeremy-prt/focus-releases/releases/latest/download/Focus.dmg">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.365 1.43c0 1.14-.42 2.2-1.12 3.02-.84.99-2.2 1.76-3.32 1.67a3.6 3.6 0 0 1 1.15-2.9c.77-.83 2.1-1.44 3.29-1.51zM20.5 17.1c-.6 1.38-.89 2-1.66 3.22-1.08 1.7-2.6 3.82-4.48 3.83-1.67.02-2.1-1.09-4.37-1.08-2.27.01-2.74 1.1-4.42 1.08-1.88-.01-3.32-1.92-4.4-3.62C-1.9 16.8-2.2 11.2.6 8.28 1.83 6.9 3.5 6.05 5.28 6.05c1.82 0 2.96 1.1 4.46 1.1 1.46 0 2.35-1.1 4.45-1.1 1.58 0 3.26.86 4.45 2.35-3.91 2.14-3.27 7.72 1.86 8.7z"/></svg>
+        <span>Télécharger</span>
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <section class="shell hero">
+    <h1>Rester <span class="mark">concentré</span>,<br>une session à la fois</h1>
+
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="https://github.com/jeremy-prt/focus-releases/releases/latest/download/Focus.dmg">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.365 1.43c0 1.14-.42 2.2-1.12 3.02-.84.99-2.2 1.76-3.32 1.67a3.6 3.6 0 0 1 1.15-2.9c.77-.83 2.1-1.44 3.29-1.51zM20.5 17.1c-.6 1.38-.89 2-1.66 3.22-1.08 1.7-2.6 3.82-4.48 3.83-1.67.02-2.1-1.09-4.37-1.08-2.27.01-2.74 1.1-4.42 1.08-1.88-.01-3.32-1.92-4.4-3.62C-1.9 16.8-2.2 11.2.6 8.28 1.83 6.9 3.5 6.05 5.28 6.05c1.82 0 2.96 1.1 4.46 1.1 1.46 0 2.35-1.1 4.45-1.1 1.58 0 3.26.86 4.45 2.35-3.91 2.14-3.27 7.72 1.86 8.7z"/></svg>
+        Télécharger pour Mac
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/jeremy-prt/focus-releases/releases">
+        Versions <span class="tag">v1.0.0</span>
+      </a>
+      <div class="facts">
+        <div class="fact"><span>Gratuit, sans compte</span><strong>macOS 14+</strong></div>
+        <div class="fact"><span>Apple Silicon</span><strong>&amp; Intel</strong></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="shell">
+    <div class="stage">
+    <div class="scene">
+      <div class="notch">25:00</div>
+
+      <div class="apple-btn">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.365 1.43c0 1.14-.42 2.2-1.12 3.02-.84.99-2.2 1.76-3.32 1.67a3.6 3.6 0 0 1 1.15-2.9c.77-.83 2.1-1.44 3.29-1.51zM20.5 17.1c-.6 1.38-.89 2-1.66 3.22-1.08 1.7-2.6 3.82-4.48 3.83-1.67.02-2.1-1.09-4.37-1.08-2.27.01-2.74 1.1-4.42 1.08-1.88-.01-3.32-1.92-4.4-3.62C-1.9 16.8-2.2 11.2.6 8.28 1.83 6.9 3.5 6.05 5.28 6.05c1.82 0 2.96 1.1 4.46 1.1 1.46 0 2.35-1.1 4.45-1.1 1.58 0 3.26.86 4.45 2.35-3.91 2.14-3.27 7.72 1.86 8.7z"/></svg>
+      </div>
+
+      <div class="menubar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff7ed" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2" stroke-linecap="round"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff7ed" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1" fill="#fff7ed"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff7ed" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.4" fill="#fff7ed"/><circle cx="15" cy="17" r="2.4" fill="#fff7ed"/></svg>
+        <span>jeu. 09:41</span>
+      </div>
+
+      <img class="window" src="assets/window.png" width="800" height="1118"
+           alt="La fenêtre de Focus : 25:00 au centre d'un anneau, le dégradé du soir en fond.">
+
+      <nav class="dock" aria-label="Mes autres apps macOS">
+        <a class="dock-app" href="https://github.com/jeremy-prt/focus-releases/releases/latest/download/Focus.dmg" aria-label="Focus — télécharger">
+          <img src="assets/dock/focus.png" width="512" height="512" alt="Focus">
+          <span class="tip" aria-hidden="true">Focus</span>
+        </a>
+        <a class="dock-app" href="https://jeremy-prt.github.io/yuzu-releases/" target="_blank" rel="noopener" aria-label="Yuzu">
+          <img src="assets/dock/yuzu.png" width="512" height="512" alt="Yuzu">
+          <span class="tip" aria-hidden="true">Yuzu</span>
+        </a>
+        <a class="dock-app" href="https://orby.live/" target="_blank" rel="noopener" aria-label="Orby">
+          <img src="assets/dock/orby.png" width="512" height="512" alt="Orby">
+          <span class="tip" aria-hidden="true">Orby</span>
+        </a>
+        <a class="dock-app" href="https://jeremy-prt.github.io/claude-usage-mini/" target="_blank" rel="noopener" aria-label="Claude Usage Mini">
+          <img src="assets/dock/claude-usage.png" width="512" height="512" alt="Claude Usage Mini">
+          <span class="tip" aria-hidden="true">Claude Usage Mini</span>
+        </a>
+      </nav>
+    </div>
+
+    <div class="panel" aria-hidden="true">
+      <div class="row"><span>Focus · 25:00</span></div>
+      <div class="row dim"><span>Session 1 sur 4</span></div>
+      <hr>
+      <div class="row"><span>Démarrer</span></div>
+      <div class="row"><span>Recommencer cette session</span></div>
+      <div class="row"><span>Passer à l'étape suivante</span></div>
+      <hr>
+      <div class="row"><span>Pilule dans l'encoche</span><i class="switch"></i></div>
+      <hr>
+      <div class="row"><span>Réglages…</span></div>
+      <div class="row"><span>Quitter Focus</span></div>
+    </div>
+    </div>
+  </section>
+
+  <section class="shell features">
+    <div class="feature">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="2" y="4" width="20" height="14" rx="2.5"/>
+        <path d="M9 4h6v2.2a1.8 1.8 0 0 1-1.8 1.8h-2.4A1.8 1.8 0 0 1 9 6.2z"/>
+        <path d="M8 21h8"/>
+      </svg>
+      <h2>Compte à rebours dans l'encoche</h2>
+    </div>
+    <div class="feature">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1"/>
+        <path d="M20.7 3.8v4.4h-4.4"/>
+        <path d="M12 7.6V12l2.8 1.9"/>
+      </svg>
+      <h2>Cycle Pomodoro automatique</h2>
+    </div>
+    <div class="feature">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.6"/>
+        <path d="M12 2v2.2M12 19.8V22M2 12h2.2M19.8 12H22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M19.1 4.9l-1.6 1.6M6.5 17.5l-1.6 1.6"/>
+      </svg>
+      <h2>Dégradé qui suit l'heure</h2>
+    </div>
+    <div class="feature">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="2" y="6" width="20" height="12" rx="2.5"/>
+        <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/>
+      </svg>
+      <h2>Tout au clavier</h2>
+    </div>
+  </section>
+
+  <section class="shell closing">
+    <a class="btn btn-primary" href="https://github.com/jeremy-prt/focus-releases/releases/latest/download/Focus.dmg">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.365 1.43c0 1.14-.42 2.2-1.12 3.02-.84.99-2.2 1.76-3.32 1.67a3.6 3.6 0 0 1 1.15-2.9c.77-.83 2.1-1.44 3.29-1.51zM20.5 17.1c-.6 1.38-.89 2-1.66 3.22-1.08 1.7-2.6 3.82-4.48 3.83-1.67.02-2.1-1.09-4.37-1.08-2.27.01-2.74 1.1-4.42 1.08-1.88-.01-3.32-1.92-4.4-3.62C-1.9 16.8-2.2 11.2.6 8.28 1.83 6.9 3.5 6.05 5.28 6.05c1.82 0 2.96 1.1 4.46 1.1 1.46 0 2.35-1.1 4.45-1.1 1.58 0 3.26.86 4.45 2.35-3.91 2.14-3.27 7.72 1.86 8.7z"/></svg>
+      Télécharger pour Mac
+    </a>
+  </section>
+
+  <section class="shell faq" id="faq">
+    <h2>Questions</h2>
+
+    <details>
+      <summary>macOS refuse d'ouvrir Focus</summary>
+      <p>L'app est signée localement, donc inconnue d'Apple : au premier lancement macOS
+        propose de la mettre à la corbeille. Cliquer « Terminé ».</p>
+      <p>Puis ouvrir <strong>Réglages Système &gt; Confidentialité et sécurité</strong>,
+        descendre tout en bas, cliquer <strong>« Ouvrir quand même »</strong> et confirmer.
+        C'est à faire une seule fois.</p>
+    </details>
+
+    <details>
+      <summary>Quelle configuration ?</summary>
+      <p>macOS 14 Sonoma minimum. Le binaire est universel : Apple Silicon et Intel.</p>
+    </details>
+
+    <details>
+      <summary>Et sur un Mac sans encoche ?</summary>
+      <p>La pastille devient un petit bandeau arrondi flottant juste sous la barre des
+        menus. Le comportement est identique.</p>
+    </details>
+
+    <details>
+      <summary>C'est payant ?</summary>
+      <p>Non, c'est gratuit. Le code source reste privé, ce dépôt public ne porte que le
+        binaire et cette page.</p>
+    </details>
+  </section>
+</main>
+
+<footer>
+  <div class="footer-links">
+    <a href="https://github.com/jeremy-prt/focus-releases" target="_blank" rel="noopener">Dépôt</a>
+    <a href="https://github.com/jeremy-prt/focus-releases/releases" target="_blank" rel="noopener">Versions</a>
+    <a href="https://portfolio2025-rose-seven.vercel.app/" target="_blank" rel="noopener">Fait par Jérémy</a>
+  </div>
+  <div class="wordmark" aria-hidden="true">Focus</div>
+</footer>
+
+</body>
+</html>
